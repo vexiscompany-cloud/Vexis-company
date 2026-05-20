@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Instagram, Youtube, MessageCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Instagram, Youtube, MessageCircle, CheckCircle2, ChevronRight, Loader2, Send } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// Lazy initialize Supabase client
+const getSupabase = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
 const Search = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -61,15 +73,56 @@ export default function App() {
     empresa: '',
     experiencia: 'Nunca fiz anúncios'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleWhatsApp = () => {
     window.location.href = "https://wa.me/5591988626328";
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const text = `Olá! Tenho interesse na Vexis Company.%0A%0A*Dados do formulário:*%0A*Nome:* ${formData.nome}%0A*E-mail:* ${formData.email}%0A*WhatsApp:* ${formData.whatsapp}%0A*Empresa:* ${formData.empresa}%0A*Já investiu em tráfego pago?:* ${formData.experiencia}`;
-    window.location.href = `https://wa.me/5591988626328?text=${text}`;
+    setIsSubmitting(true);
+    
+    try {
+      const supabase = getSupabase();
+      
+      if (!supabase) {
+        throw new Error('Configuração do Supabase ausente. Verifique as variáveis de ambiente.');
+      }
+
+      // Save to Supabase
+      const { error } = await supabase
+        .from('leads')
+        .insert([
+          { 
+            nome: formData.nome,
+            email: formData.email,
+            whatsapp: formData.whatsapp,
+            empresa: formData.empresa,
+            experiencia: formData.experiencia,
+            created_at: new Date().toISOString() 
+          }
+        ]);
+
+      if (error) throw error;
+      
+      setIsSubmitted(true);
+      
+      // WhatsApp text as a fallback/next step
+      const text = `Olá! Acabei de enviar o formulário no site e tenho interesse na Vexis Company.%0A%0A*Dados do formulário:*%0A*Nome:* ${formData.nome}%0A*E-mail:* ${formData.email}%0A*WhatsApp:* ${formData.whatsapp}%0A*Empresa:* ${formData.empresa}%0A*Já investiu em tráfego pago?:* ${formData.experiencia}`;
+      
+      // Delay redirect slightly so they see the success message
+      setTimeout(() => {
+        window.location.href = `https://wa.me/5591988626328?text=${text}`;
+      }, 2000);
+
+    } catch (error) {
+       console.error('Supabase Error:', error);
+       alert('Erro ao enviar formulário. Por favor, tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -78,9 +131,9 @@ export default function App() {
       {/* NAVBAR */}
       <nav className="fixed top-0 w-full z-50 bg-transparent py-4 text-white">
         <div className="container mx-auto px-6 flex justify-center md:justify-between items-center">
-          <a href="#" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity text-center opacity-70 md:opacity-100">
-            <img src="https://i.imgur.com/yFYxnAk.png" alt="Vexis Logo" className="w-8 h-8 md:w-12 md:h-12 object-contain" />
-            <span className="font-display font-black text-2xl md:text-4xl tracking-tighter text-white uppercase">VEXIS</span>
+          <a href="#" className="flex items-center gap-2 hover:opacity-80 transition-opacity text-center opacity-70 md:opacity-100">
+            <img src="https://i.imgur.com/yFYxnAk.png" alt="Vexis Logo" className="w-6 h-6 md:w-8 md:h-8 object-contain" />
+            <span className="font-display font-black text-lg md:text-2xl tracking-tighter text-white uppercase">VEXIS</span>
           </a>
           
           <div className="hidden md:flex items-center gap-8 font-medium">
@@ -103,27 +156,14 @@ export default function App() {
         <section id="hero" className="relative min-h-[90vh] flex items-center py-24 md:py-20 overflow-hidden bg-black">
           <div className="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center relative z-20 pt-16 md:pt-0 text-white">
             <div className="text-left">
-              <h1 className="font-display font-black tracking-tighter text-3xl md:text-5xl lg:text-3xl leading-[1.1] mb-6">
-                PRECISANDO <span className="text-gold">VENDER</span> <br className="hidden md:block" /> MAIS IMÓVEIS?
+              <h1 className="font-display font-black tracking-tight text-3xl sm:text-4xl md:text-5xl lg:text-4xl xl:text-4xl leading-[1.15] mb-6 max-w-2xl">
+                A Vexis Company nasceu para<br />
+                transformar <span className="text-gold">corretores de imóveis</span><br />
+                em máquinas de fechar negócios.
               </h1>
-              <p className="text-base md:text-lg text-white/70 mb-8 max-w-xl leading-relaxed">
-                Aumentamos a carteira de clientes da sua corretora com estratégia, autoridade digital e execução — sem depender só de indicação.
+              <p className="text-base md:text-lg text-white/80 max-w-2xl leading-relaxed">
+                Já movimentamos milhões de reais em vendas de imóveis em todo o Brasil. Agora, aplicamos esse conhecimento exclusivamente com corretores — com estratégia, método e resultado comprovado.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button 
-                  onClick={handleWhatsApp}
-                  className="bg-gold text-black font-display font-bold text-base md:text-lg px-6 py-3 rounded-lg hover:brightness-110 transition-all uppercase flex items-center justify-center gap-2 w-full sm:w-auto"
-                >
-                  QUERO MAIS CLIENTES
-                  <ChevronRight size={20} />
-                </button>
-                <a 
-                  href="#comofunciona"
-                  className="border-2 border-white/10 text-white font-display font-bold text-base md:text-lg px-6 py-3 rounded-lg hover:bg-white/5 transition-all uppercase text-center w-full sm:w-auto"
-                >
-                  COMO FUNCIONA
-                </a>
-              </div>
             </div>
           </div>
 
@@ -196,75 +236,112 @@ export default function App() {
 
               {/* FORMULÁRIO */}
               <div className="bg-dark-card p-6 md:p-10 rounded-3xl border border-gold/20 shadow-2xl shadow-gold/5 max-w-lg md:ml-auto w-full backdrop-blur-sm bg-black/40">
-                <form onSubmit={handleFormSubmit} className="space-y-5">
-                  <div>
-                    <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Nome Completo</label>
-                    <input 
-                      type="text" required 
-                      className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
-                      placeholder="Ex: João Silva"
-                      value={formData.nome || ''}
-                      onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">E-mail corporativo</label>
-                    <input 
-                      type="email" required 
-                      className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
-                      placeholder="seuemail@empresa.com"
-                      value={formData.email || ''}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Telefone da pessoa (com DDD)</label>
-                    <input 
-                      type="tel" required 
-                      className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
-                      placeholder="(00) 00000-0000"
-                      value={formData.whatsapp}
-                      onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Nome da empresa</label>
-                    <input 
-                      type="text" required 
-                      className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
-                      placeholder="Ex: Imobiliária Vexis"
-                      value={formData.empresa}
-                      onChange={(e) => setFormData({...formData, empresa: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-4 uppercase tracking-wider text-white/50">Já investiu em tráfego pago?</label>
-                    <div className="space-y-3">
-                      {[
-                        "Já contratei uma agência no passado",
-                        "Nunca fiz anúncios",
-                        "Já fiz anúncios por conta própria",
-                        "Estou com uma agência, porém insatisfeito"
-                      ].map((item) => (
-                        <label key={item} className="flex items-center gap-3 cursor-pointer group">
-                          <input 
-                            type="radio" name="exp" 
-                            className="w-5 h-5 accent-gold border-white/20 bg-black cursor-pointer"
-                            checked={formData.experiencia === item}
-                            onChange={() => setFormData({...formData, experiencia: item})}
-                          />
-                          <span className="group-hover:text-gold transition-colors text-xs md:text-sm uppercase font-medium">{item}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full bg-gold text-black font-display font-bold text-xl py-5 rounded-lg hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-gold/20 uppercase mt-4"
+                {isSubmitted ? (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-10"
                   >
-                    MAIS INFORMAÇÕES
-                  </button>
-                </form>
+                    <div className="bg-gold/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle2 className="text-gold w-10 h-10" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-4 uppercase">Solicitação Enviada!</h3>
+                    <p className="text-white/70 mb-8">
+                      Obrigado, {formData.nome.split(' ')[0]}! Seus dados foram guardados com sucesso. 
+                      Agora estamos te redirecionando para o nosso WhatsApp para agilizar seu atendimento...
+                    </p>
+                    <div className="flex justify-center gap-2">
+                       <Loader2 className="animate-spin text-gold" />
+                       <span className="text-gold text-sm font-bold uppercase tracking-widest">Redirecionando...</span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <form onSubmit={handleFormSubmit} className="space-y-5">
+                    <div>
+                      <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Nome Completo</label>
+                      <input 
+                        type="text" required 
+                        className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
+                        placeholder="Ex: João Silva"
+                        disabled={isSubmitting}
+                        value={formData.nome || ''}
+                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">E-mail corporativo</label>
+                      <input 
+                        type="email" required 
+                        className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
+                        placeholder="seuemail@empresa.com"
+                        disabled={isSubmitting}
+                        value={formData.email || ''}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Telefone da pessoa (com DDD)</label>
+                      <input 
+                        type="tel" required 
+                        className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
+                        placeholder="(00) 00000-0000"
+                        disabled={isSubmitting}
+                        value={formData.whatsapp}
+                        onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-2 uppercase tracking-wider text-white/50">Nome da empresa</label>
+                      <input 
+                        type="text" required 
+                        className="w-full bg-black/60 border border-white/10 p-4 rounded-lg focus:border-gold outline-none transition-all text-sm"
+                        placeholder="Ex: Imobiliária Vexis"
+                        disabled={isSubmitting}
+                        value={formData.empresa}
+                        onChange={(e) => setFormData({...formData, empresa: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-4 uppercase tracking-wider text-white/50">Já investiu em tráfego pago?</label>
+                      <div className="space-y-3">
+                        {[
+                          "Já contratei uma agência no passado",
+                          "Nunca fiz anúncios",
+                          "Já fiz anúncios por conta própria",
+                          "Estou com uma agência, porém insatisfeito"
+                        ].map((item) => (
+                          <label key={item} className="flex items-center gap-3 cursor-pointer group">
+                            <input 
+                              type="radio" name="exp" 
+                              className="w-5 h-5 accent-gold border-white/20 bg-black cursor-pointer"
+                              disabled={isSubmitting}
+                              checked={formData.experiencia === item}
+                              onChange={() => setFormData({...formData, experiencia: item})}
+                            />
+                            <span className="group-hover:text-gold transition-colors text-xs md:text-sm uppercase font-medium">{item}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <button 
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-gold text-black font-display font-bold text-xl py-5 rounded-lg hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-gold/20 uppercase mt-4 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          PROCESSANDO...
+                        </>
+                      ) : (
+                        <>
+                          ENVIAR AGORA
+                          <Send size={20} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>
@@ -331,44 +408,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* QUEM SOMOS */}
-        <section className="py-24 bg-black">
-          <div className="container mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
-            <div
-              className="order-2 md:order-1"
-            >
-              <h2 className="font-display font-black tracking-tight text-3xl md:text-5xl lg:text-3xl mb-8 uppercase">POR QUE A <span className="text-gold">VEXIS</span>?</h2>
-              <div className="space-y-6 text-white/70 text-lg leading-relaxed">
-                <p>
-                  Não somos apenas uma "agência de tráfego". Somos parceiros estratégicos do seu crescimento. Entendemos que o mercado imobiliário não aceita amadores.
-                </p>
-                <p>
-                  Nosso foco é colocar o seu produto na frente de quem realmente tem poder de compra, construindo uma marca que seja referência na sua região. 
-                </p>
-                <p className="text-white font-bold italic">
-                  "Menos cliques inúteis, mais reuniões produtivas."
-                </p>
-              </div>
-              <button 
-                onClick={handleWhatsApp}
-                className="mt-10 border-2 border-gold text-gold font-display font-bold text-lg px-8 py-3 rounded-md hover:bg-gold hover:text-black transition-all uppercase"
-              >
-                CONHECER O TIME VEXIS
-              </button>
-            </div>
-            
-            <div className="relative order-1 md:order-2">
-              <div className="absolute -top-6 -left-6 w-24 h-24 border-t-4 border-l-4 border-gold z-0"></div>
-              <div className="absolute -bottom-6 -right-6 w-24 h-24 border-b-4 border-r-4 border-gold z-0"></div>
-              <img 
-                src="https://i.imgur.com/yWL1D6ih.jpg" 
-                alt="Agência Vexis" 
-                className="w-full h-full object-cover rounded-md relative z-10 shadow-2xl shadow-gold/20"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          </div>
-        </section>
+
 
       </main>
 
